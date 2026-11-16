@@ -1,1 +1,18 @@
 
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "boydglassservice01",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-11-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boyd-glass-service-db",
+      "database_id": "36ad97a6-f46c-4f3c-9c06-fb2c900b19f8"
+    }
+  ]
+}
