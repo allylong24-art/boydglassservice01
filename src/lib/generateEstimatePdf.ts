@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf"
 import type { EstimateBreakdown, EstimateInput } from "./pricing"
-import { SERVICE_LABELS } from "./pricing"
+import { SERVICE_LABELS, getAutoPartLabel } from "./pricing"
 
 export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBreakdown, customer?: { name?: string; email?: string; phone?: string }) {
   const doc = new jsPDF()
@@ -47,12 +47,23 @@ export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBre
   y += 8
   doc.setFontSize(11)
   doc.setTextColor(20)
-  doc.text(`Dimensions: ${input.width}" x ${input.height}" per unit`, margin, y)
-  y += 7
-  doc.text(`Quantity: ${input.quantity}`, margin, y)
-  y += 7
-  doc.text(`Total area: ${breakdown.totalSqFt} sq ft`, margin, y)
-  y += 12
+  if (input.serviceType === "auto") {
+    if (input.vehicle) {
+      doc.text(`Vehicle: ${input.vehicle.year} ${input.vehicle.make} ${input.vehicle.model}`, margin, y)
+      y += 7
+    }
+    doc.text(`Glass: ${getAutoPartLabel(input.glassTypeId)}`, margin, y)
+    y += 7
+    doc.text(`Quantity: ${input.quantity}`, margin, y)
+    y += 12
+  } else {
+    doc.text(`Dimensions: ${input.width}" x ${input.height}" per unit`, margin, y)
+    y += 7
+    doc.text(`Quantity: ${input.quantity}`, margin, y)
+    y += 7
+    doc.text(`Total area: ${breakdown.totalSqFt} sq ft`, margin, y)
+    y += 12
+  }
 
   doc.setFontSize(13)
   doc.setTextColor(29, 78, 216)
@@ -88,7 +99,9 @@ export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBre
   doc.setFontSize(9)
   doc.setTextColor(120)
   const disclaimer =
-    "This is an automated estimate based on the information provided. Final pricing will be confirmed after an on-site measurement and inspection. Prices are subject to change based on actual site conditions, material availability, and access requirements."
+    input.serviceType === "auto"
+      ? "This is an automated estimate based on the vehicle selected. Final pricing will be confirmed after a VIN check, since glass options (sensors, cameras, heating) vary by trim. Prices are subject to change based on part availability."
+      : "This is an automated estimate based on the information provided. Final pricing will be confirmed after an on-site measurement and inspection. Prices are subject to change based on actual site conditions, material availability, and access requirements."
   const lines = doc.splitTextToSize(disclaimer, 170)
   doc.text(lines, margin, y)
 

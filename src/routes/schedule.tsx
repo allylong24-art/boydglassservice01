@@ -6,6 +6,7 @@ import { createAppointment } from "../server/appointments.functions"
 import { uploadAppointmentPhoto } from "../server/uploads.functions"
 import { createCheckoutSession } from "../server/payments.functions"
 import { SERVICE_LABELS } from "../lib/pricing"
+import { EMPTY_VEHICLE, VehiclePicker, formatVehicle, isVehicleComplete, type Vehicle } from "../components/VehiclePicker"
 import { Upload, CheckCircle2, CreditCard } from "lucide-react"
 
 export const Route = createFileRoute("/schedule")({
@@ -27,6 +28,7 @@ function SchedulePage() {
   const [phone, setPhone] = useState("")
   const [address, setAddress] = useState("")
   const [notes, setNotes] = useState("")
+  const [vehicle, setVehicle] = useState<Vehicle>(EMPTY_VEHICLE)
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -35,6 +37,10 @@ function SchedulePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (serviceType === "auto" && !isVehicleComplete(vehicle)) {
+      setError("Please select your vehicle's year, make, and model.")
+      return
+    }
     setSubmitting(true)
     setError("")
     try {
@@ -55,7 +61,10 @@ function SchedulePage() {
           customerEmail: email,
           customerPhone: phone,
           address,
-          notes,
+          notes:
+            serviceType === "auto"
+              ? [`Vehicle: ${formatVehicle(vehicle)}`, notes].filter(Boolean).join("\n")
+              : notes,
           photoKeys,
         },
       })
@@ -117,6 +126,13 @@ function SchedulePage() {
               <option value="other">Other / Not Sure</option>
             </select>
           </div>
+
+          {serviceType === "auto" && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Your Vehicle</label>
+              <VehiclePicker value={vehicle} onChange={setVehicle} />
+            </div>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div>

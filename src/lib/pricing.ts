@@ -1,6 +1,8 @@
-export type ServiceType = "window" | "shower" | "commercial"
+export type ServiceType = "window" | "shower" | "commercial" | "auto"
+/** Services priced by measured square footage (everything except auto glass). */
+export type AreaServiceType = Exclude<ServiceType, "auto">
 
-export const GLASS_TYPES: Record<ServiceType, { id: string; label: string; pricePerSqFt: number }[]> = {
+export const GLASS_TYPES: Record<AreaServiceType, { id: string; label: string; pricePerSqFt: number }[]> = {
   window: [
     { id: "single-pane", label: "Single Pane", pricePerSqFt: 12 },
     { id: "double-pane", label: "Double Pane (Insulated)", pricePerSqFt: 22 },
@@ -21,7 +23,7 @@ export const GLASS_TYPES: Record<ServiceType, { id: string; label: string; price
   ],
 }
 
-export const LABOR_OPTIONS: Record<ServiceType, { id: string; label: string; ratePerUnit: number }[]> = {
+export const LABOR_OPTIONS: Record<AreaServiceType, { id: string; label: string; ratePerUnit: number }[]> = {
   window: [
     { id: "standard", label: "Standard Installation", ratePerUnit: 45 },
     { id: "custom-frame", label: "Custom Frame Fitting", ratePerUnit: 85 },
@@ -43,6 +45,28 @@ export const ADDITIONAL_SERVICES = [
   { id: "site-cleanup", label: "Job Site Cleanup", flatFee: 40, perUnit: false },
 ]
 
+// PLACEHOLDER auto glass prices — replace with real rates (e.g. set against local competitor quotes).
+// Auto glass is priced per piece of glass for the selected vehicle, not by square footage.
+export const AUTO_GLASS_PARTS = [
+  { id: "windshield", label: "Windshield Replacement", partPrice: 260, laborPrice: 110 },
+  { id: "side-window", label: "Side / Door Window", partPrice: 140, laborPrice: 85 },
+  { id: "back-glass", label: "Back Glass (Rear Window)", partPrice: 280, laborPrice: 120 },
+  { id: "vent-quarter", label: "Vent / Quarter Glass", partPrice: 110, laborPrice: 75 },
+  { id: "chip-repair", label: "Windshield Chip Repair", partPrice: 0, laborPrice: 79 },
+]
+
+export const AUTO_INSTALL_OPTIONS = [
+  { id: "in-shop", label: "In-Shop Service", fee: 0 },
+  { id: "mobile", label: "Mobile Service (we come to you)", fee: 35 },
+]
+
+export const AUTO_GLASS_ADDONS = [
+  { id: "adas-calibration", label: "ADAS Camera Recalibration (lane assist, auto-braking)", flatFee: 249, perUnit: false },
+  { id: "rain-sensor", label: "Rain Sensor / Heated Glass", flatFee: 75, perUnit: true },
+  { id: "oem-glass", label: "OEM (Dealer-Brand) Glass Upgrade", flatFee: 150, perUnit: true },
+  { id: "molding", label: "New Moldings / Clips", flatFee: 40, perUnit: true },
+]
+
 export const TAX_RATE = 0.07
 export const SERVICE_CALL_FEE = 49
 
@@ -54,6 +78,8 @@ export interface EstimateInput {
   glassTypeId: string
   laborOptionId: string
   additionalServiceIds: string[]
+  /** Only used for auto glass estimates. */
+  vehicle?: { year: number; make: string; model: string }
 }
 
 export interface EstimateBreakdown {
@@ -70,6 +96,8 @@ export interface EstimateBreakdown {
 
 export function calculateEstimate(input: EstimateInput): EstimateBreakdown {
   const { serviceType, width, height, quantity, glassTypeId, laborOptionId, additionalServiceIds } = input
+  if (serviceType === "auto") return calculateAutoEstimate(input)
+
   const sqFtPerUnit = (width * height) / 144
   const totalSqFt = sqFtPerUnit * quantity
 
@@ -104,6 +132,40 @@ export function calculateEstimate(input: EstimateInput): EstimateBreakdown {
   }
 }
 
+function calculateAutoEstimate(input: EstimateInput): EstimateBreakdown {
+  const { quantity, glassTypeId, laborOptionId, additionalServiceIds } = input
+  const part = AUTO_GLASS_PARTS.find((p) => p.id === glassTypeId) ?? AUTO_GLASS_PARTS[0]
+  const install = AUTO_INSTALL_OPTIONS.find((o) => o.id === laborOptionId) ?? AUTO_INSTALL_OPTIONS[0]
+
+  const materialsCost = part.partPrice * quantity
+  const laborCost = part.laborPrice * quantity
+  let additionalCost = install.fee
+  for (const id of additionalServiceIds) {
+    const addon = AUTO_GLASS_ADDONS.find((a) => a.id === id)
+    if (!addon) continue
+    additionalCost += addon.perUnit ? addon.flatFee * quantity : addon.flatFee
+  }
+
+  const feesCost = 0
+  const subtotal = materialsCost + laborCost + additionalCost + feesCost
+  const taxCost = subtotal * TAX_RATE
+  return {
+    sqFtPerUnit: 0,
+    totalSqFt: 0,
+    materialsCost: round(materialsCost),
+    laborCost: round(laborCost),
+    additionalCost: round(additionalCost),
+    feesCost: round(feesCost),
+    subtotal: round(subtotal),
+    taxCost: round(taxCost),
+    totalCost: round(subtotal + taxCost),
+  }
+}
+
+export function getAutoPartLabel(id: string) {
+  return (AUTO_GLASS_PARTS.find((p) => p.id === id) ?? AUTO_GLASS_PARTS[0]).label
+}
+
 function round(n: number) {
   return Math.round(n * 100) / 100
 }
@@ -112,4 +174,5 @@ export const SERVICE_LABELS: Record<ServiceType, string> = {
   window: "Window Glass Replacement",
   shower: "Shower Door Installation",
   commercial: "Commercial / Storefront Glass",
+  auto: "Auto Glass",
 }
