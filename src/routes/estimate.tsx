@@ -11,6 +11,7 @@ import {
   type ServiceType,
 } from "../lib/pricing"
 import { submitEstimate } from "../server/estimates.functions"
+import { AutoGlassEstimator } from "../components/AutoGlassEstimator"
 import { generateEstimatePdf } from "../lib/generateEstimatePdf"
 import { Printer, Mail, Download, Save, Calculator } from "lucide-react"
 
@@ -23,6 +24,7 @@ const SERVICE_TYPES: ServiceType[] = ["window", "shower", "commercial"]
 function EstimatePage() {
   const submitEstimateFn = useServerFn(submitEstimate)
 
+  const [mode, setMode] = useState<ServiceType | "auto">("window")
   const [serviceType, setServiceType] = useState<ServiceType>("window")
   const [width, setWidth] = useState(36)
   const [height, setHeight] = useState(48)
@@ -38,6 +40,7 @@ function EstimatePage() {
   const [error, setError] = useState("")
 
   function selectService(type: ServiceType) {
+    setMode(type)
     setServiceType(type)
     setGlassTypeId(GLASS_TYPES[type][0].id)
     setLaborOptionId(LABOR_OPTIONS[type][0].id)
@@ -95,26 +98,40 @@ function EstimatePage() {
       <PageHero title="Instant Estimate Calculator" subtitle="Get a ballpark price in seconds. Final pricing confirmed after an on-site measurement." compact />
 
       <section className="py-12 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">1. Choose a Service</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {SERVICE_TYPES.map((type) => (
+              <button
+                key={type}
+                onClick={() => selectService(type)}
+                className={`rounded-lg border p-4 text-left text-sm font-medium transition-colors ${
+                  mode === type
+                    ? "border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600"
+                    : "border-slate-200 text-slate-600 hover:border-blue-300"
+                }`}
+              >
+                {SERVICE_LABELS[type]}
+              </button>
+            ))}
+            <button
+              onClick={() => setMode("auto")}
+              className={`rounded-lg border p-4 text-left text-sm font-medium transition-colors ${
+                mode === "auto"
+                  ? "border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600"
+                  : "border-slate-200 text-slate-600 hover:border-blue-300"
+              }`}
+            >
+              Automotive Glass
+            </button>
+          </div>
+        </div>
+
+        {mode === "auto" ? (
+          <AutoGlassEstimator />
+        ) : (
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">1. Choose a Service</h2>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {SERVICE_TYPES.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => selectService(type)}
-                    className={`rounded-lg border p-4 text-left text-sm font-medium transition-colors ${
-                      serviceType === type
-                        ? "border-blue-600 bg-blue-50 text-blue-800 ring-1 ring-blue-600"
-                        : "border-slate-200 text-slate-600 hover:border-blue-300"
-                    }`}
-                  >
-                    {SERVICE_LABELS[type]}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div>
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">2. Measurements &amp; Quantity</h2>
@@ -306,6 +323,7 @@ function EstimatePage() {
             </div>
           </div>
         </div>
+        )}
       </section>
     </div>
   )

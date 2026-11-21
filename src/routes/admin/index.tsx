@@ -8,13 +8,14 @@ import { listEstimates } from "../../server/estimates.functions"
 import { listPricingConfig, updatePricingConfig, exportCustomerData } from "../../server/admin.functions"
 import { listGallery, uploadGalleryImage, deleteGalleryImage } from "../../server/gallery.functions"
 import { listAllReviewsAdmin } from "../../server/reviews.functions"
-import { LogOut, Calendar, Calculator, DollarSign, Image as ImageIcon, Download, Star } from "lucide-react"
+import { LogOut, Calendar, Calculator, DollarSign, Image as ImageIcon, Download, Star, Car } from "lucide-react"
+import { AutoPartsTab } from "../../components/admin/AutoPartsTab"
 
 export const Route = createFileRoute("/admin/")({
   component: AdminPage,
 })
 
-type Tab = "appointments" | "estimates" | "pricing" | "gallery" | "reviews" | "export"
+type Tab = "appointments" | "estimates" | "pricing" | "auto" | "gallery" | "reviews" | "export"
 
 function AdminPage() {
   const { user, ready, logout } = useIdentity()
@@ -44,6 +45,7 @@ function Dashboard({ onLogout }: { onLogout: () => Promise<void> }) {
             ["appointments", "Appointments", Calendar],
             ["estimates", "Estimates", Calculator],
             ["pricing", "Pricing", DollarSign],
+            ["auto", "Auto Glass (NAGS)", Car],
             ["gallery", "Gallery", ImageIcon],
             ["reviews", "Reviews", Star],
             ["export", "Export Data", Download],
@@ -64,6 +66,7 @@ function Dashboard({ onLogout }: { onLogout: () => Promise<void> }) {
       {tab === "appointments" && <AppointmentsTab />}
       {tab === "estimates" && <EstimatesTab />}
       {tab === "pricing" && <PricingTab />}
+      {tab === "auto" && <AutoPartsTab />}
       {tab === "gallery" && <GalleryTab />}
       {tab === "reviews" && <ReviewsTab />}
       {tab === "export" && <ExportTab />}
@@ -171,7 +174,15 @@ function EstimatesTab() {
           {rows.map((r) => (
             <tr key={r.id}>
               <td className="px-4 py-3 font-medium text-slate-800">{r.customerName || "—"}<br /><span className="text-xs text-slate-400">{r.customerEmail}</span></td>
-              <td className="px-4 py-3 text-slate-600">{r.serviceType}</td>
+              <td className="px-4 py-3 text-slate-600">
+                {r.serviceType}
+                {r.serviceType === "auto" && r.inputData && typeof r.inputData === "object" && (
+                  <span className="block text-xs text-slate-400">
+                    {String((r.inputData as any).vehicle ?? "")} &middot; {String((r.inputData as any).position ?? "")}
+                    {(r.inputData as any).nagsNumber ? ` (${(r.inputData as any).nagsNumber})` : ""}
+                  </span>
+                )}
+              </td>
               <td className="px-4 py-3 font-semibold text-slate-800">${r.totalCost}</td>
               <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</td>
             </tr>
@@ -214,13 +225,14 @@ function PricingTab() {
         <div key={r.id} className="rounded-lg border border-slate-200 p-4">
           <label className="block text-xs font-medium text-slate-500 mb-1">{r.label}</label>
           <div className="flex items-center gap-2">
-            <span className="text-slate-400">$</span>
+            {r.unit !== "percent" && <span className="text-slate-400">$</span>}
             <input
               type="number"
               defaultValue={r.value}
               onBlur={(e) => save(r.id, e.target.value)}
               className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
+            {r.unit === "percent" && <span className="text-slate-400">%</span>}
             {savingId === r.id && <span className="text-xs text-slate-400">saving...</span>}
           </div>
         </div>
