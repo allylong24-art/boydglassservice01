@@ -4,21 +4,26 @@ import { useServerFn } from "@tanstack/react-start"
 import { PageHero } from "../components/PageHero"
 import {
   ADDITIONAL_SERVICES,
+  AUTO_GLASS_ADDONS,
+  AUTO_GLASS_PARTS,
+  AUTO_INSTALL_OPTIONS,
   GLASS_TYPES,
   LABOR_OPTIONS,
   SERVICE_LABELS,
   calculateEstimate,
+  getAutoPartLabel,
   type ServiceType,
 } from "../lib/pricing"
 import { submitEstimate } from "../server/estimates.functions"
 import { generateEstimatePdf } from "../lib/generateEstimatePdf"
 import { Printer, Mail, Download, Save, Calculator } from "lucide-react"
+import { EMPTY_VEHICLE, VehiclePicker, formatVehicle, isVehicleComplete, type Vehicle } from "../components/VehiclePicker"
 
 export const Route = createFileRoute("/estimate")({
   component: EstimatePage,
 })
 
-const SERVICE_TYPES: ServiceType[] = ["window", "shower", "commercial"]
+const SERVICE_TYPES: ServiceType[] = ["window", "shower", "commercial", "auto"]
 
 function EstimatePage() {
   const submitEstimateFn = useServerFn(submitEstimate)
@@ -30,6 +35,7 @@ function EstimatePage() {
   const [glassTypeId, setGlassTypeId] = useState(GLASS_TYPES.window[0].id)
   const [laborOptionId, setLaborOptionId] = useState(LABOR_OPTIONS.window[0].id)
   const [additionalServiceIds, setAdditionalServiceIds] = useState<string[]>([])
+  const [vehicle, setVehicle] = useState<Vehicle>(EMPTY_VEHICLE)
   const [customerName, setCustomerName] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
@@ -39,8 +45,14 @@ function EstimatePage() {
 
   function selectService(type: ServiceType) {
     setServiceType(type)
-    setGlassTypeId(GLASS_TYPES[type][0].id)
-    setLaborOptionId(LABOR_OPTIONS[type][0].id)
+    if (type === "auto") {
+      setGlassTypeId(AUTO_GLASS_PARTS[0].id)
+      setLaborOptionId(AUTO_INSTALL_OPTIONS[0].id)
+    } else {
+      setGlassTypeId(GLASS_TYPES[type][0].id)
+      setLaborOptionId(LABOR_OPTIONS[type][0].id)
+    }
+    setAdditionalServiceIds([])
     setSaved(false)
   }
 
@@ -49,9 +61,26 @@ function EstimatePage() {
     setSaved(false)
   }
 
+  const isAuto = serviceType === "auto"
+  const vehicleReady = isVehicleComplete(vehicle)
+  // Auto glass prices only show once the customer has picked their exact vehicle.
+  const showPrice = !isAuto || vehicleReady
+
   const input = useMemo(
-    () => ({ serviceType, width, height, quantity, glassTypeId, laborOptionId, additionalServiceIds }),
-    [serviceType, width, height, quantity, glassTypeId, laborOptionId, additionalServiceIds]
+    () => ({
+      serviceType,
+      width,
+      height,
+      quantity,
+      glassTypeId,
+      laborOptionId,
+      additionalServiceIds,
+      vehicle:
+        serviceType === "auto" && isVehicleComplete(vehicle)
+          ? { year: vehicle.year, make: vehicle.make, model: vehicle.model }
+          : undefined,
+    }),
+    [serviceType, width, height, quantity, glassTypeId, laborOptionId, additionalServiceIds, vehicle]
   )
 
   const breakdown = useMemo(() => calculateEstimate(input), [input])
@@ -84,8 +113,11 @@ function EstimatePage() {
 
   function handleEmail() {
     const subject = encodeURIComponent("My Boyd Glass Service Estimate")
+    const details = isAuto
+      ? `Vehicle: ${formatVehicle(vehicle)}\nGlass: ${getAutoPartLabel(glassTypeId)}, Qty: ${quantity}`
+      : `Dimensions: ${width}" x ${height}", Qty: ${quantity}`
     const body = encodeURIComponent(
-      `Service: ${SERVICE_LABELS[serviceType]}\nDimensions: ${width}" x ${height}", Qty: ${quantity}\n\nMaterials: $${breakdown.materialsCost.toFixed(2)}\nLabor: $${breakdown.laborCost.toFixed(2)}\nAdditional: $${breakdown.additionalCost.toFixed(2)}\nFees: $${breakdown.feesCost.toFixed(2)}\nTax: $${breakdown.taxCost.toFixed(2)}\n\nEstimated Total: $${breakdown.totalCost.toFixed(2)}\n\nFinal price confirmed after on-site measurement.`
+      `Service: ${SERVICE_LABELS[serviceType]}\n${details}\n\nMaterials: $${breakdown.materialsCost.toFixed(2)}\nLabor: $${breakdown.laborCost.toFixed(2)}\nAdditional: $${breakdown.additionalCost.toFixed(2)}\nFees: $${breakdown.feesCost.toFixed(2)}\nTax: $${breakdown.taxCost.toFixed(2)}\n\nEstimated Total: $${breakdown.totalCost.toFixed(2)}\n\n${isAuto ? "Final price confirmed after a VIN check." : "Final price confirmed after on-site measurement."}`
     )
     window.location.href = `mailto:${customerEmail || ""}?subject=${subject}&body=${body}`
   }
@@ -99,7 +131,7 @@ function EstimatePage() {
           <div className="lg:col-span-2 space-y-8">
             <div>
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">1. Choose a Service</h2>
-              <div className="grid sm:grid-cols-3 gap-3">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {SERVICE_TYPES.map((type) => (
                   <button
                     key={type}
@@ -116,6 +148,111 @@ function EstimatePage() {
               </div>
             </div>
 
+            {serviceType === "auto" ? (
+              <>
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">2. Your Vehicle</h2>
+                  <VehiclePicker
+                    value={vehicle}
+                    onChange={(v) => {
+                      setVehicle(v)
+                      setSaved(false)
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">3. What Needs Fixing?</h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {AUTO_GLASS_PARTS.map((p) => (
+                      <label
+                        key={p.id}
+                        className={`flex items-center justify-between rounded-lg border p-3 text-sm cursor-pointer ${
+                          glassTypeId === p.id ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="autoPart"
+                            checked={glassTypeId === p.id}
+                            onChange={() => setGlassTypeId(p.id)}
+                            className="accent-blue-600"
+                          />
+                          {p.label}
+                        </span>
+                        <span className="text-slate-500 text-xs">from ${p.partPrice + p.laborPrice}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3 w-32">
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Quantity</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">4. Where Should We Do It?</h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {AUTO_INSTALL_OPTIONS.map((o) => (
+                      <label
+                        key={o.id}
+                        className={`flex items-center justify-between rounded-lg border p-3 text-sm cursor-pointer ${
+                          laborOptionId === o.id ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            name="autoInstall"
+                            checked={laborOptionId === o.id}
+                            onChange={() => setLaborOptionId(o.id)}
+                            className="accent-blue-600"
+                          />
+                          {o.label}
+                        </span>
+                        <span className="text-slate-500 text-xs">{o.fee ? `+$${o.fee}` : "Included"}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">5. Vehicle Features &amp; Extras</h2>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {AUTO_GLASS_ADDONS.map((a) => (
+                      <label
+                        key={a.id}
+                        className={`flex items-center justify-between rounded-lg border p-3 text-sm cursor-pointer ${
+                          additionalServiceIds.includes(a.id) ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={additionalServiceIds.includes(a.id)}
+                            onChange={() => toggleAdditional(a.id)}
+                            className="accent-blue-600"
+                          />
+                          {a.label}
+                        </span>
+                        <span className="text-slate-500 text-xs whitespace-nowrap pl-2">
+                          ${a.flatFee}
+                          {a.perUnit ? "/piece" : ""}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
             <div>
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">2. Measurements &amp; Quantity</h2>
               <div className="grid grid-cols-3 gap-4">
@@ -232,6 +369,9 @@ function EstimatePage() {
               </div>
             </div>
 
+              </>
+            )}
+
             <div>
               <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">6. Contact Info (optional, for saving/emailing)</h2>
               <div className="grid sm:grid-cols-3 gap-4">
@@ -264,13 +404,18 @@ function EstimatePage() {
                 <Calculator className="h-5 w-5 text-blue-700" />
                 <h3 className="font-semibold text-slate-800">Estimate Summary</h3>
               </div>
-              <div className="text-xs text-slate-500 mb-4">{SERVICE_LABELS[serviceType]} &middot; {breakdown.totalSqFt} sq ft total</div>
+              <div className="text-xs text-slate-500 mb-4">
+                {SERVICE_LABELS[serviceType]} &middot;{" "}
+                {isAuto ? (vehicleReady ? `${formatVehicle(vehicle)} · ${getAutoPartLabel(glassTypeId)}` : "No vehicle selected") : `${breakdown.totalSqFt} sq ft total`}
+              </div>
 
+              {showPrice ? (
+              <>
               <dl className="space-y-2 text-sm">
-                <Row label="Materials" value={breakdown.materialsCost} />
+                <Row label={isAuto ? "Glass" : "Materials"} value={breakdown.materialsCost} />
                 <Row label="Labor" value={breakdown.laborCost} />
-                <Row label="Additional Services" value={breakdown.additionalCost} />
-                <Row label="Service Call Fee" value={breakdown.feesCost} />
+                <Row label={isAuto ? "Service & Extras" : "Additional Services"} value={breakdown.additionalCost} />
+                {!isAuto && <Row label="Service Call Fee" value={breakdown.feesCost} />}
                 <Row label="Tax (7%)" value={breakdown.taxCost} />
               </dl>
 
@@ -282,24 +427,31 @@ function EstimatePage() {
               </div>
 
               <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                This is an automated estimate. Final pricing will be confirmed after an on-site measurement and
-                inspection.
+                {isAuto
+                  ? "This is an automated estimate. Final pricing will be confirmed after a VIN check, since sensors, cameras, and heated glass vary by trim."
+                  : "This is an automated estimate. Final pricing will be confirmed after an on-site measurement and inspection."}
               </p>
+              </>
+              ) : (
+                <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+                  Pick your vehicle's year, make, and model to see your price instantly.
+                </p>
+              )}
 
               {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
               {saved && <p className="mt-3 text-xs text-green-600">Estimate saved! We'll follow up if you provided contact info.</p>}
 
               <div className="grid grid-cols-2 gap-2 mt-5">
-                <button onClick={handleSave} disabled={saving} className="flex items-center justify-center gap-1.5 rounded-md bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60">
+                <button onClick={handleSave} disabled={saving || !showPrice} className="flex items-center justify-center gap-1.5 rounded-md bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60">
                   <Save className="h-3.5 w-3.5" /> {saving ? "Saving..." : "Save"}
                 </button>
-                <button onClick={handleDownload} className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button onClick={handleDownload} disabled={!showPrice} className="flex items-center disabled:opacity-60 justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                   <Download className="h-3.5 w-3.5" /> Download PDF
                 </button>
-                <button onClick={handlePrint} className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button onClick={handlePrint} disabled={!showPrice} className="flex items-center disabled:opacity-60 justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                   <Printer className="h-3.5 w-3.5" /> Print
                 </button>
-                <button onClick={handleEmail} className="flex items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button onClick={handleEmail} disabled={!showPrice} className="flex items-center disabled:opacity-60 justify-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                   <Mail className="h-3.5 w-3.5" /> Email
                 </button>
               </div>
