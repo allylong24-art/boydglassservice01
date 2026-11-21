@@ -12,6 +12,8 @@ import {
   SERVICE_LABELS,
   calculateEstimate,
   getAutoPartLabel,
+  getGlassTypeLabels,
+  getLaborOptionLabels,
   type ServiceType,
 } from "../lib/pricing"
 import { submitEstimate } from "../server/estimates.functions"
@@ -34,6 +36,8 @@ function EstimatePage() {
   const [quantity, setQuantity] = useState(1)
   const [glassTypeId, setGlassTypeId] = useState(GLASS_TYPES.window[0].id)
   const [laborOptionId, setLaborOptionId] = useState(LABOR_OPTIONS.window[0].id)
+  const [glassTypeIds, setGlassTypeIds] = useState<string[]>([GLASS_TYPES.window[0].id])
+  const [laborOptionIds, setLaborOptionIds] = useState<string[]>([LABOR_OPTIONS.window[0].id])
   const [additionalServiceIds, setAdditionalServiceIds] = useState<string[]>([])
   const [vehicle, setVehicle] = useState<Vehicle>(EMPTY_VEHICLE)
   const [customerName, setCustomerName] = useState("")
@@ -51,8 +55,16 @@ function EstimatePage() {
     } else {
       setGlassTypeId(GLASS_TYPES[type][0].id)
       setLaborOptionId(LABOR_OPTIONS[type][0].id)
+      setGlassTypeIds([GLASS_TYPES[type][0].id])
+      setLaborOptionIds([LABOR_OPTIONS[type][0].id])
     }
     setAdditionalServiceIds([])
+    setSaved(false)
+  }
+
+  // Keeps at least one option checked so the estimate always has a glass type and labor option.
+  function toggleInList(setter: (fn: (prev: string[]) => string[]) => void, id: string) {
+    setter((prev) => (prev.includes(id) ? (prev.length > 1 ? prev.filter((x) => x !== id) : prev) : [...prev, id]))
     setSaved(false)
   }
 
@@ -74,13 +86,14 @@ function EstimatePage() {
       quantity,
       glassTypeId,
       laborOptionId,
+      ...(serviceType === "auto" ? {} : { glassTypeIds, laborOptionIds }),
       additionalServiceIds,
       vehicle:
         serviceType === "auto" && isVehicleComplete(vehicle)
           ? { year: vehicle.year, make: vehicle.make, model: vehicle.model }
           : undefined,
     }),
-    [serviceType, width, height, quantity, glassTypeId, laborOptionId, additionalServiceIds, vehicle]
+    [serviceType, width, height, quantity, glassTypeId, laborOptionId, glassTypeIds, laborOptionIds, additionalServiceIds, vehicle]
   )
 
   const breakdown = useMemo(() => calculateEstimate(input), [input])
@@ -115,7 +128,7 @@ function EstimatePage() {
     const subject = encodeURIComponent("My Boyd Glass Service Estimate")
     const details = isAuto
       ? `Vehicle: ${formatVehicle(vehicle)}\nGlass: ${getAutoPartLabel(glassTypeId)}, Qty: ${quantity}`
-      : `Dimensions: ${width}" x ${height}", Qty: ${quantity}`
+      : `Dimensions: ${width}" x ${height}", Qty: ${quantity}\nGlass: ${getGlassTypeLabels(serviceType, glassTypeIds).join(", ")}\nLabor: ${getLaborOptionLabels(serviceType, laborOptionIds).join(", ")}`
     const body = encodeURIComponent(
       `Service: ${SERVICE_LABELS[serviceType]}\n${details}\n\nMaterials: $${breakdown.materialsCost.toFixed(2)}\nLabor: $${breakdown.laborCost.toFixed(2)}\nAdditional: $${breakdown.additionalCost.toFixed(2)}\nFees: $${breakdown.feesCost.toFixed(2)}\nTax: $${breakdown.taxCost.toFixed(2)}\n\nEstimated Total: $${breakdown.totalCost.toFixed(2)}\n\n${isAuto ? "Final price confirmed after a VIN check." : "Final price confirmed after on-site measurement."}`
     )
@@ -290,21 +303,20 @@ function EstimatePage() {
             </div>
 
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">3. Glass Type</h2>
+              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">3. Glass Type <span className="normal-case font-normal text-slate-500">(select all that apply)</span></h2>
               <div className="grid sm:grid-cols-2 gap-3">
                 {GLASS_TYPES[serviceType].map((g) => (
                   <label
                     key={g.id}
                     className={`flex items-center justify-between rounded-lg border p-3 text-sm cursor-pointer ${
-                      glassTypeId === g.id ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                      glassTypeIds.includes(g.id) ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
                     }`}
                   >
                     <span className="flex items-center gap-2">
                       <input
-                        type="radio"
-                        name="glassType"
-                        checked={glassTypeId === g.id}
-                        onChange={() => setGlassTypeId(g.id)}
+                        type="checkbox"
+                        checked={glassTypeIds.includes(g.id)}
+                        onChange={() => toggleInList(setGlassTypeIds, g.id)}
                         className="accent-blue-600"
                       />
                       {g.label}
@@ -316,21 +328,20 @@ function EstimatePage() {
             </div>
 
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">4. Labor Option</h2>
+              <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide mb-3">4. Labor Options <span className="normal-case font-normal text-slate-500">(select all that apply)</span></h2>
               <div className="grid sm:grid-cols-2 gap-3">
                 {LABOR_OPTIONS[serviceType].map((l) => (
                   <label
                     key={l.id}
                     className={`flex items-center justify-between rounded-lg border p-3 text-sm cursor-pointer ${
-                      laborOptionId === l.id ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
+                      laborOptionIds.includes(l.id) ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-blue-300"
                     }`}
                   >
                     <span className="flex items-center gap-2">
                       <input
-                        type="radio"
-                        name="laborOption"
-                        checked={laborOptionId === l.id}
-                        onChange={() => setLaborOptionId(l.id)}
+                        type="checkbox"
+                        checked={laborOptionIds.includes(l.id)}
+                        onChange={() => toggleInList(setLaborOptionIds, l.id)}
                         className="accent-blue-600"
                       />
                       {l.label}

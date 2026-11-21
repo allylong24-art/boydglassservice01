@@ -1,6 +1,6 @@
 import { jsPDF } from "jspdf"
 import type { EstimateBreakdown, EstimateInput } from "./pricing"
-import { SERVICE_LABELS, getAutoPartLabel } from "./pricing"
+import { SERVICE_LABELS, getAutoPartLabel, getGlassTypeLabels, getLaborOptionLabels } from "./pricing"
 
 export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBreakdown, customer?: { name?: string; email?: string; phone?: string }) {
   const doc = new jsPDF()
@@ -62,7 +62,18 @@ export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBre
     doc.text(`Quantity: ${input.quantity}`, margin, y)
     y += 7
     doc.text(`Total area: ${breakdown.totalSqFt} sq ft`, margin, y)
-    y += 12
+    y += 7
+    const glassIds = input.glassTypeIds?.length ? input.glassTypeIds : [input.glassTypeId]
+    const laborIds = input.laborOptionIds?.length ? input.laborOptionIds : [input.laborOptionId]
+    for (const line of doc.splitTextToSize(`Glass: ${getGlassTypeLabels(input.serviceType, glassIds).join(", ")}`, 170)) {
+      doc.text(line, margin, y)
+      y += 7
+    }
+    for (const line of doc.splitTextToSize(`Labor: ${getLaborOptionLabels(input.serviceType, laborIds).join(", ")}`, 170)) {
+      doc.text(line, margin, y)
+      y += 7
+    }
+    y += 5
   }
 
   doc.setFontSize(13)
