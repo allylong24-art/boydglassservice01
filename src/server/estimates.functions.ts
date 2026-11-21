@@ -13,6 +13,8 @@ const EstimateInputSchema = z.object({
   quantity: z.number().int().positive(),
   glassTypeId: z.string(),
   laborOptionId: z.string(),
+  glassTypeIds: z.array(z.string()).optional(),
+  laborOptionIds: z.array(z.string()).optional(),
   additionalServiceIds: z.array(z.string()),
   vehicle: z
     .object({ year: z.number().int(), make: z.string().min(1).max(100), model: z.string().min(1).max(100) })

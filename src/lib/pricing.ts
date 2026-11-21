@@ -77,6 +77,10 @@ export interface EstimateInput {
   quantity: number
   glassTypeId: string
   laborOptionId: string
+  /** Multiple glass types (area services). When present, overrides glassTypeId. */
+  glassTypeIds?: string[]
+  /** Multiple labor options (area services). When present, overrides laborOptionId. */
+  laborOptionIds?: string[]
   additionalServiceIds: string[]
   /** Only used for auto glass estimates. */
   vehicle?: { year: number; make: string; model: string }
@@ -101,11 +105,15 @@ export function calculateEstimate(input: EstimateInput): EstimateBreakdown {
   const sqFtPerUnit = (width * height) / 144
   const totalSqFt = sqFtPerUnit * quantity
 
-  const glass = GLASS_TYPES[serviceType].find((g) => g.id === glassTypeId) ?? GLASS_TYPES[serviceType][0]
-  const labor = LABOR_OPTIONS[serviceType].find((l) => l.id === laborOptionId) ?? LABOR_OPTIONS[serviceType][0]
+  const glassIds = input.glassTypeIds?.length ? input.glassTypeIds : [glassTypeId]
+  const laborIds = input.laborOptionIds?.length ? input.laborOptionIds : [laborOptionId]
+  const glasses = GLASS_TYPES[serviceType].filter((g) => glassIds.includes(g.id))
+  const labors = LABOR_OPTIONS[serviceType].filter((l) => laborIds.includes(l.id))
+  if (glasses.length === 0) glasses.push(GLASS_TYPES[serviceType][0])
+  if (labors.length === 0) labors.push(LABOR_OPTIONS[serviceType][0])
 
-  const materialsCost = totalSqFt * glass.pricePerSqFt
-  const laborCost = labor.ratePerUnit * quantity
+  const materialsCost = totalSqFt * glasses.reduce((sum, g) => sum + g.pricePerSqFt, 0)
+  const laborCost = labors.reduce((sum, l) => sum + l.ratePerUnit, 0) * quantity
 
   let additionalCost = 0
   for (const id of additionalServiceIds) {
@@ -160,6 +168,14 @@ function calculateAutoEstimate(input: EstimateInput): EstimateBreakdown {
     taxCost: round(taxCost),
     totalCost: round(subtotal + taxCost),
   }
+}
+
+export function getGlassTypeLabels(serviceType: AreaServiceType, ids: string[]) {
+  return GLASS_TYPES[serviceType].filter((g) => ids.includes(g.id)).map((g) => g.label)
+}
+
+export function getLaborOptionLabels(serviceType: AreaServiceType, ids: string[]) {
+  return LABOR_OPTIONS[serviceType].filter((l) => ids.includes(l.id)).map((l) => l.label)
 }
 
 export function getAutoPartLabel(id: string) {
