@@ -58,3 +58,24 @@ export const galleryImages = pgTable("gallery_images", {
   category: text("category").notNull().default("general"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Automotive glass parts entered by the shop from their NAGS books/software.
+// NAGS list prices and labor hours are licensed data, so they are never sent to the browser —
+// customer prices are computed server-side in src/server/auto-glass.functions.ts.
+export const autoGlassParts = pgTable("auto_glass_parts", {
+  id: serial().primaryKey(),
+  nagsNumber: text("nags_number").notNull(),
+  yearStart: integer("year_start").notNull(),
+  yearEnd: integer("year_end").notNull(),
+  make: text("make").notNull(),
+  model: text("model").notNull(),
+  bodyStyle: text("body_style"),
+  position: text("position").notNull(),
+  description: text("description"),
+  listPrice: numeric("list_price", { precision: 10, scale: 2 }).notNull(),
+  laborHours: numeric("labor_hours", { precision: 6, scale: 2 }).notNull(),
+  calibrationRequired: boolean("calibration_required").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});

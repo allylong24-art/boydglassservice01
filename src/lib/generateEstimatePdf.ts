@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf"
 import type { EstimateBreakdown, EstimateInput } from "./pricing"
 import { SERVICE_LABELS } from "./pricing"
+import type { AutoEstimateBreakdown } from "./autoGlass"
 
 export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBreakdown, customer?: { name?: string; email?: string; phone?: string }) {
   const doc = new jsPDF()
@@ -92,5 +93,88 @@ export function generateEstimatePdf(input: EstimateInput, breakdown: EstimateBre
   const lines = doc.splitTextToSize(disclaimer, 170)
   doc.text(lines, margin, y)
 
+  return doc
+}
+
+export function generateAutoEstimatePdf(
+  job: { vehicle: string; position: string; description?: string | null; mobileService: boolean },
+  breakdown: AutoEstimateBreakdown,
+  customer?: { name?: string; email?: string; phone?: string }
+) {
+  const doc = new jsPDF()
+  const margin = 20
+  let y = margin
+
+  doc.setFontSize(18)
+  doc.setTextColor(29, 78, 216)
+  doc.text("Boyd Glass Service", margin, y)
+  y += 7
+  doc.setFontSize(11)
+  doc.setTextColor(100)
+  doc.text("Automotive Glass Estimate", margin, y)
+  y += 12
+  doc.setDrawColor(220)
+  doc.line(margin, y, 190, y)
+  y += 10
+
+  doc.setFontSize(12)
+  doc.setTextColor(20)
+  const info: string[] = [`Date: ${new Date().toLocaleDateString()}`]
+  if (customer?.name) info.push(`Customer: ${customer.name}`)
+  if (customer?.email) info.push(`Email: ${customer.email}`)
+  if (customer?.phone) info.push(`Phone: ${customer.phone}`)
+  for (const line of info) {
+    doc.text(line, margin, y)
+    y += 8
+  }
+
+  y += 4
+  doc.setFontSize(13)
+  doc.setTextColor(29, 78, 216)
+  doc.text("Vehicle & Glass", margin, y)
+  y += 8
+  doc.setFontSize(11)
+  doc.setTextColor(20)
+  doc.text(`Vehicle: ${job.vehicle}`, margin, y)
+  y += 7
+  doc.text(`Glass: ${job.position}${job.description ? ` - ${job.description}` : ""}`, margin, y)
+  y += 7
+  doc.text(`Service: ${job.mobileService ? "Mobile (we come to you)" : "In-shop"}`, margin, y)
+  y += 12
+
+  doc.setFontSize(13)
+  doc.setTextColor(29, 78, 216)
+  doc.text("Cost Breakdown", margin, y)
+  y += 8
+  doc.setFontSize(11)
+  doc.setTextColor(20)
+  const rows: [string, number][] = [
+    ["Glass", breakdown.glassCost],
+    ["Installation Labor", breakdown.laborCost],
+    ["Installation Kit (urethane, molding)", breakdown.kitFee],
+  ]
+  if (breakdown.calibrationFee > 0) rows.push(["ADAS Camera Calibration", breakdown.calibrationFee])
+  if (breakdown.mobileFee > 0) rows.push(["Mobile Service", breakdown.mobileFee])
+  rows.push([`Tax (${breakdown.taxRatePercent}%)`, breakdown.taxCost])
+  for (const [label, amount] of rows) {
+    doc.text(label, margin, y)
+    doc.text(`$${amount.toFixed(2)}`, 170, y, { align: "right" })
+    y += 7
+  }
+
+  y += 3
+  doc.line(margin, y, 190, y)
+  y += 10
+  doc.setFontSize(14)
+  doc.setTextColor(29, 78, 216)
+  doc.text("Estimated Total", margin, y)
+  doc.text(`$${breakdown.totalCost.toFixed(2)}`, 170, y, { align: "right" })
+  y += 16
+
+  doc.setFontSize(9)
+  doc.setTextColor(120)
+  const disclaimer =
+    "This is an automated estimate based on the vehicle and glass selected. Final pricing will be confirmed once we verify your VIN and glass options (sensors, heating, tint, etc.). Insurance claims are billed according to your policy."
+  doc.text(doc.splitTextToSize(disclaimer, 170), margin, y)
   return doc
 }
